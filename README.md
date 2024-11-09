@@ -9,4 +9,4 @@ I am still working on improving this tool, and I am always open for feedback.
 
 **Example of usage**:
 <br>
-<video src="./EXAMPLE_OF_USAGE.mp4" width="640" height="360" controls></video>
+![example video](EXAMPLE_OF_USAGE.mp4)
