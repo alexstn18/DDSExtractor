@@ -9,4 +9,4 @@ I am still working on improving this tool, and I am always open for feedback.
 
 **Example of usage**:
 <br>
-![example video](EXAMPLE_OF_USAGE.mp4)
+![example video](./EXAMPLE_OF_USAGE.mp4)
