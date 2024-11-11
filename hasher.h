@@ -27,9 +27,30 @@ namespace hasher
         return (value << count) | (value >> (32 - count));
     }
 
+    uint32_t DWORDInHexBytesToU32(const char* value)
+    {
+        // this is little endian so this might be a problem for fucking sti
+        uint32_t decimal =
+            (value[0]) |   // least significant byte
+            (value[1] << 8) |   // second byte
+            (value[2] << 16) |   // third byte
+            (value[3] << 24);    // most significant byte
+
+        return decimal;
+    }
+
+    uint16_t WORDInHexBytesToU16(const char* value)
+    {
+        uint16_t decimal =
+            (value[0]) |        // least significant byte
+            (value[1] << 8);    // most significant byte
+
+        return decimal;
+    }
+
     std::string calculateHash(const char* path)
     {
-        std::cout << "No More Hashes v1.1 by SutandoTsukai181" << std::endl << std::endl;
+        std::cout << std::endl << "No More Hashes v1.1 by SutandoTsukai181" << std::endl << std::endl;
 
         std::ifstream file(path, std::ios::binary | std::ios::ate);
         if (!file.is_open())
@@ -82,32 +103,11 @@ namespace hasher
                     std::cout << "Found STI header (GCT0) at position " << i << ".\n";
                     hasHeader = true;
                     bigEndian = true;
+                    width = WORDInHexBytesToU16(buffer + i + 8);
+                    height = WORDInHexBytesToU16(buffer + i + 10);
                     sti_texture_start = *(int*)(buffer + i + 16);
                     start = i;
                     break;
-                }
-            }
-
-            if (hasHeader)
-            {
-                bool ddsFound = false;
-                for (int i = start; i < start + 100; ++i)
-                {
-                    if (std::memcmp(buffer + i, "DDS", 3) == 0)
-                    {
-                        std::cout << "Found DDS header at position " << i << ".\n";
-
-                        height = *(uint32_t*)(buffer + i + 12);  // offset 12 after DDS |
-                        width = *(uint32_t*)(buffer + i + 16);   // offset 16 after DDS |
-
-                        ddsFound = true;
-                        break;
-                    }
-                }
-
-                if (!ddsFound)
-                {
-                    std::cout << "DDS header not found in expected range.\n";
                 }
             }
         }
@@ -156,6 +156,7 @@ namespace hasher
 
         int sizeAligned = size / 4; 
         int chunkSize = std::max(sizeAligned / 0x40, 1);
+        std::string textureData_string = buffer + start;
         int* textureData = reinterpret_cast<int*>(buffer + start);
 
         uint32_t hash = 0xDEADBEEF;
@@ -169,7 +170,9 @@ namespace hasher
                 break;
             }
 
-            int textureValue = textureData[index];
+            int textureValue = bigEndian
+                ? swapEndian32(buffer + start) // Pass a char* directly
+                : *(reinterpret_cast<int*>(buffer + start));
 
             hash = (rotateLeft32(hash ^ (rotateLeft32(textureValue * 0xCC9E2D51, 15) * 0x1B873593), 13) + 0xFADDAF14) * 5;
 
