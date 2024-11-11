@@ -97,8 +97,8 @@ namespace hasher
                     {
                         std::cout << "Found DDS header at position " << i << ".\n";
 
-                        height = bigEndian ? swapEndian16(buffer + i + 12) : *(uint32_t*)(buffer + i + 12);  // Offset 12 after DDS |
-                        width = bigEndian ? swapEndian16(buffer + i + 16) : *(uint32_t*)(buffer + i + 16);   // Offset 16 after DDS |
+                        height = *(uint32_t*)(buffer + i + 12);  // offset 12 after DDS |
+                        width = *(uint32_t*)(buffer + i + 16);   // offset 16 after DDS |
 
                         ddsFound = true;
                         break;
@@ -143,7 +143,7 @@ namespace hasher
                 {
                     std::cout << "Found K7TX header.\n";
                     start += 8;
-                    size = *(int*)(buffer + start - 4);
+                    size = bigEndian ? swapEndian16(buffer + start - 4) : *(int*)(buffer + start - 4);
                 }
             }
         }
@@ -197,7 +197,7 @@ namespace hasher
         hash = ((hash >> 13) ^ hash) * 0xC2B2AE35;
         hash = (hash >> 16) ^ hash;
 
-        // Format the final hash as "<width>x<height>_<hash>" for Replacement folder
+        // format the final hash as "<width>x<height>_<hash>" for Replacement folder
         if (width > 0 && height > 0 && width < 10000 && height < 10000)
         {
             char name[18 + 1];
