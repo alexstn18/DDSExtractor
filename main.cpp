@@ -25,7 +25,7 @@ int main(int argc, char* argv[])
 
     if ( argc < 2 )
     {
-        std::cout << "Please specify the mode that the tool should run in (--extract or --import): ";
+        std::cout << "Please specify the mode that the tool should run in (--extract, --extracthashed or --import): ";
         std::getline( std::cin, mode );
     }
     else
@@ -33,7 +33,7 @@ int main(int argc, char* argv[])
         mode = argv[1];
     }
 
-    if ( mode != "--extract" && mode != "--import" )
+    if ( mode != "--extract" && mode != "--extracthashed" && mode != "--import")
     {
         std::cerr << "Invalid mode: " << mode << std::endl;
         std::cerr << "Mode flag should be either --extract to extract DDS files, or --import to re-import DDS files" << std::endl;

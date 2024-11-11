@@ -1,23 +1,15 @@
 #ifndef EXTRACTORIMPL_H
 #define EXTRACTORIMPL_H
 
-#include <iostream>
-#include <fstream>
-#include <vector>
-#include <filesystem>
-#include <string>
-#include <algorithm> // for gcc peeps?
-// #include <nlohmann/json.hpp>
-
-using u8 = uint8_t;
-
-namespace fs = std::filesystem;
+#include "inc_wrapper.h"
+#include "hasher.h"
 
 const std::vector<uint8_t> DDS_MAGIC_PATTERN = { 0x44, 0x44, 0x53, 0x20, 0x7C };
 
 enum class ExtractorMode
 {
     EXTRACT,
+    EXTRACT_HASHED,
     IMPORT,
     METADATA,
     // COMPRESS,
@@ -32,8 +24,9 @@ namespace DDSExtractor
     ExtractorMode GetModeFromString(const std::string& mode_string)
     {
         if ( mode_string == "--extract" ) return ExtractorMode::EXTRACT;
+        if ( mode_string == "--extracthashed" ) return ExtractorMode::EXTRACT_HASHED;
         if ( mode_string == "--import" ) return ExtractorMode::IMPORT;
-        if ( mode_string == "--analyze" ) return ExtractorMode::METADATA;
+        if ( mode_string == "--metadata" ) return ExtractorMode::METADATA;
 
         return ExtractorMode::NONE;
     }
@@ -85,6 +78,25 @@ namespace DDSExtractor
 
         std::ofstream outputFile( output_file_path, std::ios::binary );
         if ( outputFile )
+        {
+            outputFile.write( reinterpret_cast<const char*>( dds_data.data() ), dds_data.size() );
+            std::cout << "Extracted DDS data to: " << output_file_path << std::endl;
+        }
+    }
+
+    void ExtractDDSHashed(const fs::path& file_path, std::streampos start)
+    {
+        std::ifstream file(file_path, std::ios::binary);
+
+        file.seekg(start);
+
+        std::vector<u8> dds_data( ( std::istreambuf_iterator<char>( file ) ),
+                                    std::istreambuf_iterator<char>()) ;
+
+        fs::path output_file_path = file_path.parent_path() / ( hasher::calculateHash( file_path.string().c_str() ) + ".dds" );
+
+        std::ofstream outputFile(output_file_path, std::ios::binary);
+        if (outputFile)
         {
             outputFile.write( reinterpret_cast<const char*>( dds_data.data() ), dds_data.size() );
             std::cout << "Extracted DDS data to: " << output_file_path << std::endl;
@@ -174,6 +186,28 @@ namespace DDSExtractor
                             {
                                 std::cout << "DDS pattern found in file: " << file_path << " at position " << found_pos << std::endl;
                                 ExtractDDS( file_path, found_pos );
+                            }
+                            else
+                            {
+                                std::cout << "DDS pattern not found in file: " << file_path << std::endl;
+                            }
+                            break;
+                        }
+                        case ExtractorMode::EXTRACT_HASHED:
+                        {
+                            std::ifstream file(file_path, std::ios::binary);
+
+                            if (!file)
+                            {
+                                std::cerr << "Error opening file: " << file_path << std::endl;
+                                continue;
+                            }
+
+                            std::streampos found_pos;
+                            if (FindPattern(file, found_pos))
+                            {
+                                std::cout << "DDS pattern found in file: " << file_path << " at position " << found_pos << std::endl;
+                                ExtractDDSHashed(file_path, found_pos);
                             }
                             else
                             {

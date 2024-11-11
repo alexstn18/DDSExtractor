@@ -5,5 +5,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="extractorimpl.h" />
+    <ClInclude Include="hasher.h" />
+    <ClInclude Include="inc_wrapper.h" />
   </ItemGroup>
 </Project>
