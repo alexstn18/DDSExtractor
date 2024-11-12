@@ -55,7 +55,7 @@ namespace hasher
         std::ifstream file(path, std::ios::binary | std::ios::ate);
         if (!file.is_open())
         {
-            throw std::exception("Error: File could not be opened");
+            throw std::runtime_error("Error: File could not be opened");
         }
 
         int size = file.tellg();
@@ -74,7 +74,7 @@ namespace hasher
         std::string filePath(path);
         std::string extension = filePath.substr(filePath.find_last_of('.'));
 
-        if (extension == ".bin" || extension == ".BIN") 
+        if (extension == ".bin" || extension == ".BIN")
         {
             // no additional search needed; the code already works for .bin format
             hasHeader = true;
@@ -84,7 +84,7 @@ namespace hasher
         {
             for (int i = 0; i < size - 8; ++i)
             {
-                if (std::memcmp(buffer + i, "\x00\x00\x00\x00\x06\x00\x00\x00", 8) == 0) 
+                if (std::memcmp(buffer + i, "\x00\x00\x00\x00\x06\x00\x00\x00", 8) == 0)
                 {
                     std::cout << "Found JMB texture header at position " << i << ".\n";
                     hasHeader = true;
@@ -112,7 +112,7 @@ namespace hasher
             }
         }
 
-        if (hasHeader && size > start + 0x40) 
+        if (hasHeader && size > start + 0x40)
         {
             if (!sti)
             {
@@ -132,7 +132,7 @@ namespace hasher
                 width = 0;
                 height = 0;
             }
-            else 
+            else
             {
                 std::cout << "Successfully read the header. Hashing the texture data...\n";
                 size -= textureStart;
@@ -147,14 +147,14 @@ namespace hasher
                 }
             }
         }
-        else 
+        else
         {
             std::cout << "Could not find a GCT0 or JMB-specific header. Hashing the whole file...\n";
         }
 
         std::cout << "\n";
 
-        int sizeAligned = size / 4; 
+        int sizeAligned = size / 4;
         int chunkSize = std::max(sizeAligned / 0x40, 1);
         std::string textureData_string = buffer + start;
         int* textureData = reinterpret_cast<int*>(buffer + start);
@@ -164,24 +164,20 @@ namespace hasher
 
         while (index < sizeAligned)
         {
-            if (index >= sizeAligned)
-            {
-                std::cout << "Index " << index << " is out of bounds" << std::endl;
-                break;
+            int currentPos = start + index * 4;
+            if (currentPos >= size) {
+                break;  // Ensure we donÅft read past the end of the buffer
             }
 
             int textureValue = bigEndian
-                ? swapEndian32(buffer + start) // Pass a char* directly
-                : *(reinterpret_cast<int*>(buffer + start));
+                ? swapEndian32(buffer + currentPos) // Swap endianness if needed
+                : *(reinterpret_cast<int*>(buffer + currentPos)); // Directly interpret bytes as an int
 
+            // Update hash
             hash = (rotateLeft32(hash ^ (rotateLeft32(textureValue * 0xCC9E2D51, 15) * 0x1B873593), 13) + 0xFADDAF14) * 5;
 
+            // Increment index
             index += chunkSize;
-            if (index >= sizeAligned)
-            {
-                std::cout << "Next index " << index << " is out of bounds" << std::endl;
-                break;
-            }
         }
 
         uint32_t extra_val = 0;
