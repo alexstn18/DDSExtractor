@@ -2,9 +2,13 @@
 #define HASHER_H
 
 #include "inc_wrapper.h"
+#include <cstring>
 
 // implementation from: https://web.archive.org/web/20230319040222/https://gist.github.com/SutandoTsukai181/dfe6884ee1254791ab166a0e876dda39
 // credit to SutandoTsukai181
+
+//silly thing for linux
+#define sprintf_s(buf, ...) snprintf((buf), sizeof(buf), __VA_ARGS__)
 
 namespace hasher
 {
@@ -55,7 +59,7 @@ namespace hasher
         std::ifstream file(path, std::ios::binary | std::ios::ate);
         if (!file.is_open())
         {
-            throw std::exception("Error: File could not be opened");
+            throw std::runtime_error("Error: File could not be opened");
         }
 
         int size = file.tellg();
