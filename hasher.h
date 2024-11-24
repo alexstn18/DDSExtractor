@@ -48,10 +48,152 @@ namespace hasher
         return decimal;
     }
 
-    std::string calculateHash(const char* path)
+    std::string CalculateHashOriginal(const char* path)
     {
         std::cout << std::endl << "No More Hashes v1.1 by SutandoTsukai181" << std::endl << std::endl;
 
+        std::ifstream file(path, std::ios::binary | std::ios::ate);
+
+        if (!file.is_open())
+        {
+            throw std::exception("Error: File could not be opened");
+        }
+
+        int start = 0;
+        int size = file.tellg();
+
+        char* magic = new char[5];
+        char* int_val = new char[4];
+
+        uint16_t width = 0;
+        uint16_t height = 0;
+
+        file.seekg(0, std::ios::beg);
+        file.read(magic, 4);
+        magic[4] = '\0';
+
+        // GCT0 header can either have GCT0 or null as a magic
+        if ((!strcmp(magic, "GCT0") || *magic == 0) && size > 0x40)
+        {
+            std::cout << "Reading GCT0 header...\n";
+
+            bool bigEndian = !strcmp(magic, "GCT0");
+
+            // Get width/height to generate full replacement texture name
+            file.seekg(8, std::ios::beg);
+            file.read(int_val, 2);
+            width = bigEndian ? swapEndian16(int_val) : *(uint16_t*)int_val;
+            file.read(int_val, 2);
+            height = bigEndian ? swapEndian16(int_val) : *(uint16_t*)int_val;
+
+            // Try checking for the texture start (should be always 0x40)
+            file.seekg(0x10, std::ios::beg);
+            file.read(int_val, 4);
+            start = bigEndian ? swapEndian32(int_val) : *(int*)int_val;
+
+            if (start != 0x40)
+            {
+                std::cout << "Header is invalid. Hashing the whole file...\n";
+
+                // This turned out to be a non valid header - revert back to default values
+                start = 0;
+                width = 0;
+                height = 0;
+            }
+            else
+            {
+                std::cout << "Successfully read the header. Hashing the texture data...\n";
+
+                // Remove header size from the texture size
+                size -= start;
+
+                file.seekg(start, std::ios::beg);
+                file.read(magic, 4);
+                magic[4] = '\0';
+
+                if (!strcmp(magic, "K7TX"))
+                {
+                    std::cout << "Reading K7TX header...\n";
+
+                    // DDS header starts right after K7TX
+                    // We're assuming this is always little endian
+                    start += 8;
+                    file.read((char*)&size, 4);
+                }
+            }
+        }
+        else
+        {
+            std::cout << "Could not find a GCT0 or K7TX header. Hashing the whole file...\n";
+        }
+
+        std::cout << "\n";
+
+        // Read the texture to a buffer
+        int sizeAligned = size / 4;
+        int chunkSize = std::max(sizeAligned / 0x40, 1);
+
+        int* buffer = new int[sizeAligned];
+        file.seekg(start, std::ios::beg);
+        file.read((char*)buffer, size);
+
+        // Calculate the hash
+
+        // Initial value
+        uint32_t hash = 0xDEADBEEF;
+
+        uint32_t index = 0;
+        while (index < sizeAligned)
+        {
+            hash = (rotateLeft32(hash ^ (rotateLeft32(buffer[index] * 0xCC9E2D51, 15) * 0x1B873593), 13) + 0xFADDAF14) * 5;
+            index += chunkSize;
+        }
+
+        // Read the remaining 1-3 bytes, if any
+        char extra;
+        uint32_t extra_val = 0;
+        switch (size & 3)
+        {
+        case 3:
+            file.seekg(start + (sizeAligned * 4) + 2, std::ios::beg);
+            file.read(&extra, 1);
+            extra_val = extra << 16;
+            // Fallthrough
+        case 2:
+            file.seekg(start + (sizeAligned * 4) + 1, std::ios::beg);
+            file.read(&extra, 1);
+            extra_val ^= extra << 8;
+            // Fallthrough
+        case 1:
+            file.seekg(start + (sizeAligned * 4), std::ios::beg);
+            file.read(&extra, 1);
+            extra_val = rotateLeft32((extra_val ^ extra) * 0xCC9E2D51, 15) * 0x1B873593;
+            hash ^= extra_val;
+        default:
+            break;
+        }
+
+        hash ^= size;
+
+        hash = ((hash >> 16) ^ hash) * 0x85EBCA6B;
+        hash = ((hash >> 13) ^ hash) * 0xC2B2AE35;
+        hash = (hash >> 16) ^ hash;
+
+        if (width > 0 && height > 0 && width < 10000 && height < 10000)
+        {
+            char name[18 + 1];
+            sprintf_s(name, "%04dx%04d_%x", width, height, hash);
+
+            std::cout << "Full texture name: " << name << "\n\n";
+            return name;
+        }
+
+        return {};
+    }
+
+    // broken
+    std::string calculateHash(const char* path)
+    {
         std::ifstream file(path, std::ios::binary | std::ios::ate);
         if (!file.is_open())
         {

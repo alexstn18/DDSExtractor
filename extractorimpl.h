@@ -10,9 +10,11 @@ enum class ExtractorMode
 {
     EXTRACT,
     EXTRACT_HASHED,
+    EXTRACT_ARCHIVE,
     IMPORT,
     METADATA,
-    // COMPRESS,
+    NMH_FIX_AND_HASH,
+    BIG_TO_LITTLE_ENDIAN,
     NONE
 };
 
@@ -27,8 +29,154 @@ namespace DDSExtractor
         if ( mode_string == "--extracthashed" ) return ExtractorMode::EXTRACT_HASHED;
         if ( mode_string == "--import" ) return ExtractorMode::IMPORT;
         if ( mode_string == "--metadata" ) return ExtractorMode::METADATA;
+        if ( mode_string == "--nmhfixandhash" ) return ExtractorMode::NMH_FIX_AND_HASH;
+        if ( mode_string == "--btole" ) return ExtractorMode::BIG_TO_LITTLE_ENDIAN;
 
         return ExtractorMode::NONE;
+    }
+
+    // Helper function to reverse the byte order of data in-place
+    void reverseBytes(char* data, std::size_t size)
+    {
+        std::reverse(data, data + size);
+    }
+
+    // Function to convert a big-endian binary file to little-endian
+    bool convertBigEndianToLittleEndian(const fs::path& inputFilePath, const fs::path& outputFilePath) 
+    {
+        size_t wordSize = 4;
+        // Open input file in binary read mode
+        std::ifstream inputFile(inputFilePath, std::ios::binary);
+        if (!inputFile) {
+            std::cerr << "Error: Cannot open input file " << inputFilePath << std::endl;
+            return false;
+        }
+
+        // Open output file in binary write mode
+        std::ofstream outputFile(outputFilePath, std::ios::binary);
+        if (!outputFile) {
+            std::cerr << "Error: Cannot open output file " << outputFilePath << std::endl;
+            return false;
+        }
+
+        // Process the file in chunks of `wordSize` bytes
+        std::vector<char> buffer(wordSize);
+        while (inputFile.read(buffer.data(), wordSize)) {
+            // Reverse bytes in the buffer to convert endianness
+            reverseBytes(buffer.data(), wordSize);
+            // Write the reversed data to the output file
+            outputFile.write(buffer.data(), wordSize);
+        }
+
+        // Handle the last chunk if the file size is not a multiple of wordSize
+        if (inputFile.gcount() > 0) {
+            buffer.resize(inputFile.gcount());
+            reverseBytes(buffer.data(), buffer.size());
+            outputFile.write(buffer.data(), buffer.size());
+        }
+
+        // Close the files
+        inputFile.close();
+        outputFile.close();
+
+        return true;
+    }
+
+    // Helper function to read a block of bytes from a file
+    std::vector<uint8_t> readBytes(std::ifstream& file, size_t numBytes) {
+        std::vector<uint8_t> buffer(numBytes);
+        file.read(reinterpret_cast<char*>(buffer.data()), numBytes);
+        return buffer;
+    }
+
+    // Helper function to convert integers to a zero-padded string for filenames
+    std::string intToFilename(int num) {
+        std::ostringstream ss;
+        ss << std::setw(3) << std::setfill('0') << num;
+        return ss.str();
+    }
+
+    // Function to extract DDS files
+    void ExtractTexturesFromArchive(const fs::path& filePath)
+    {
+        const std::vector<uint8_t> DDS_MAGIC = { 0x44, 0x44, 0x53, 0x20 }; // "DDS " magic bytes
+        const size_t HEADER_SIZE = 72;
+        const size_t DDS_HEADER_SIZE_OFFSET = 4;
+        const size_t PIXEL_DATA_START_OFFSET = 128; // DDS header size is generally fixed at 128 bytes
+        const std::vector<uint8_t> STOP_PATTERN = { 0x00, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00 };
+
+        std::ifstream file(filePath, std::ios::binary);
+        if (!file.is_open())
+        {
+            std::cerr << "Error: Could not open file: " << filePath << std::endl;
+            return;
+        }
+
+        std::vector<uint8_t> buffer(HEADER_SIZE + DDS_MAGIC.size());
+        int fileCount = 0;
+
+        while (file.read(reinterpret_cast<char*>(buffer.data()), buffer.size())) 
+        {
+            for (size_t i = 0; i <= buffer.size() - DDS_MAGIC.size(); ++i)
+            {
+                if (std::equal(DDS_MAGIC.begin(), DDS_MAGIC.end(), buffer.begin() + i)) 
+                {
+                    // Seek back to include the 72 bytes before DDS magic
+                    file.seekg(-static_cast<int>(buffer.size() - i + HEADER_SIZE), std::ios::cur);
+
+                    // Read the DDS header and preceding 72 bytes
+                    std::vector<uint8_t> fullHeader = readBytes(file, HEADER_SIZE + DDS_MAGIC.size());
+
+                    // Get DDS header size to determine pixel data start point
+                    uint32_t headerSize;
+                    std::memcpy(&headerSize, fullHeader.data() + DDS_HEADER_SIZE_OFFSET, sizeof(uint32_t));
+
+                    // Start reading pixel data until stop pattern is found
+                    std::vector<uint8_t> pixelData;
+                    std::vector<uint8_t> stopBuffer(STOP_PATTERN.size());
+                    bool stopFound = false;
+
+                    while (file.read(reinterpret_cast<char*>(stopBuffer.data()), stopBuffer.size()))
+                    {
+                        if (std::equal(STOP_PATTERN.begin(), STOP_PATTERN.end(), stopBuffer.begin())) 
+                        {
+                            stopFound = true;
+                            file.seekg(-static_cast<int>(STOP_PATTERN.size()), std::ios::cur);
+                            break;
+                        }
+                        pixelData.insert(pixelData.end(), stopBuffer.begin(), stopBuffer.end());
+                        file.seekg(-static_cast<int>(STOP_PATTERN.size() - 1), std::ios::cur);
+                    }
+
+                    if (!stopFound)
+                    {
+                        // Read remaining file if stop pattern not found
+                        pixelData.insert(pixelData.end(), std::istreambuf_iterator<char>(file), {});
+                    }
+
+                    // Save the extracted DDS file
+                    std::string outputFileName = "extracted_" + intToFilename(fileCount++) + ".dds";
+                    std::ofstream outFile(outputFileName, std::ios::binary);
+                    if (outFile.is_open()) 
+                    {
+                        outFile.write(reinterpret_cast<const char*>(fullHeader.data()), fullHeader.size());
+                        outFile.write(reinterpret_cast<const char*>(pixelData.data()), pixelData.size());
+                        outFile.close();
+                        std::cout << "Saved DDS file: " << outputFileName << "\n";
+                    }
+                    else 
+                    {
+                        std::cerr << "Error: Could not save file: " << outputFileName << "\n";
+                    }
+
+                    // Reset buffer and continue search
+                    break;
+                }
+            }
+            file.seekg(-static_cast<int>(DDS_MAGIC.size() - 1), std::ios::cur);
+        }
+
+        file.close();
     }
 
     /// <summary>
@@ -93,7 +241,7 @@ namespace DDSExtractor
         std::vector<u8> dds_data( ( std::istreambuf_iterator<char>( file ) ),
                                     std::istreambuf_iterator<char>()) ;
 
-        fs::path output_file_path = file_path.parent_path() / ( hasher::calculateHash( file_path.string().c_str() ) + ".dds" );
+        fs::path output_file_path = file_path.parent_path() / ( hasher::CalculateHashOriginal( file_path.string().c_str() ) + ".dds" );
 
         std::ofstream outputFile(output_file_path, std::ios::binary);
         if (outputFile)
@@ -101,6 +249,13 @@ namespace DDSExtractor
             outputFile.write( reinterpret_cast<const char*>( dds_data.data() ), dds_data.size() );
             std::cout << "Extracted DDS data to: " << output_file_path << std::endl;
         }
+    }
+
+    void RenameNMHBinToHash(fs::path& file_path)
+    {
+        fs::path new_name = file_path.parent_path() / (hasher::CalculateHashOriginal(file_path.string().c_str()) + ".bin");
+    
+        fs::rename(file_path, new_name);
     }
 
     /// <summary>
@@ -157,6 +312,27 @@ namespace DDSExtractor
         std::cout << "Re-imported DDS data into: " << original_file_path << std::endl;
     }
 
+    void RemoveLast16BytesFromFile(const fs::path& nmh_bin_path)
+    {
+        std::fstream file(nmh_bin_path, std::ios::in | std::ios::out | std::ios::binary);
+
+        file.seekg(0, std::ios::end);
+        std::streampos file_size = file.tellg();
+
+        std::streampos new_size = file_size - std::streamoff(16);
+
+        file.seekg(0, std::ios::beg);
+        std::vector<char> buffer(new_size);
+        file.read(buffer.data(), new_size);
+        file.close();
+
+        std::ofstream out(nmh_bin_path, std::ios::out | std::ios::binary | std::ios::trunc);
+        out.write(buffer.data(), buffer.size());
+
+        std::cout << "Successfully removed the last 16 bytes from the file." << std::endl;
+        out.close();
+    }
+
     /// <summary>
     /// Once the program has been given a directory to work in, from the user, + the extraction mode, this function processes the given files and based on the extraction mode it does the necessary operation (extraction/reimport, etc.)
     /// </summary>
@@ -166,7 +342,7 @@ namespace DDSExtractor
         {
             if ( entry.is_regular_file() )
             {
-                const auto& file_path = entry.path();
+                fs::path file_path = entry.path();
                 if ( std::find( extensions.begin(), extensions.end(), file_path.extension().string() ) != extensions.end() )
                 {
                     switch ( extract_mode )
@@ -224,9 +400,16 @@ namespace DDSExtractor
                             }
                             break;
                         }
-                        case ExtractorMode::METADATA:
+                        case ExtractorMode::NMH_FIX_AND_HASH:
                         {
-                            std::cerr << "WIP" << std::endl;
+                            RemoveLast16BytesFromFile( file_path );
+                            RenameNMHBinToHash( file_path );
+                            break;
+                        }
+                        case ExtractorMode::BIG_TO_LITTLE_ENDIAN:
+                        {
+                            fs::path out = file_path.parent_path() / (file_path.stem().string() + "_le.bin");
+                            convertBigEndianToLittleEndian(file_path, out);
                             break;
                         }
                         default:

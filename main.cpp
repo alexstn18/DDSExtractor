@@ -33,7 +33,7 @@ int main(int argc, char* argv[])
         mode = argv[1];
     }
 
-    if ( mode != "--extract" && mode != "--extracthashed" && mode != "--import")
+    if ( mode != "--extract" && mode != "--extracthashed" && mode != "--import" && mode != "--nmhfixandhash" && mode != "--btole" && mode != "--extractarchive" )
     {
         std::cerr << "Invalid mode: " << mode << std::endl;
         std::cerr << "Mode flag should be either --extract to extract DDS files, or --import to re-import DDS files" << std::endl;
@@ -56,7 +56,7 @@ int main(int argc, char* argv[])
     if ( extractor_mode_flag == ExtractorMode::NONE ) 
     {
         std::cerr << "Invalid mode: " << mode << std::endl;
-        std::cerr << "Mode flag should be one of --extract or --import" << std::endl;
+        std::cerr << "Mode flag should be one of --extract, --extracthashed or --import" << std::endl;
         return 1;
     }
 
