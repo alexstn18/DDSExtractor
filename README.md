@@ -16,8 +16,6 @@ I am still working on improving this tool, and I am always open for feedback.
 
 **--extracthashed**: Extracts textures in .dds format with MurmurHash variants for easy placement in the `Replacement` folder of Killer7.
 
-### `--extracthashed` IS CURRENTLY BROKEN!! (outputs the wrong hashes)
-
 ## Requirements:
 VCRedist: **https://aka.ms/vs/17/release/vc_redist.x64.exe**
 
