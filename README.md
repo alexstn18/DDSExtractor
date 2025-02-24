@@ -16,8 +16,13 @@ I am still working on improving this tool, and I am always open for feedback.
 
 **--extracthashed**: Extracts textures in .dds format with MurmurHash variants for easy placement in the `Replacement` folder of Killer7.
 
+**--nmhfixandhash**: for .bin GCT0 texture files from No More Heroes that are not hashed and have an extra 16 empty bytes at the end of the file.
+
+**--bintodds**: for fixed and hashed .bin GCT0 texture files from No More Heroes, it converts them into DXT1 DDS image files.
+
 ## Requirements:
 VCRedist: **https://aka.ms/vs/17/release/vc_redist.x64.exe**
 
 ## Additional credits:
 - **SutandoTsukai181**: No More Hashes (https://web.archive.org/web/20230319040222/https://gist.github.com/SutandoTsukai181/dfe6884ee1254791ab166a0e876dda39)
+- **Venomalia**: Dolphin Texture Extraction tool (https://github.com/Venomalia/DolphinTextureExtraction-tool)
