@@ -7,5 +7,6 @@
     <ClInclude Include="extractorimpl.h" />
     <ClInclude Include="hasher.h" />
     <ClInclude Include="inc_wrapper.h" />
+    <ClInclude Include="NMH.h" />
   </ItemGroup>
 </Project>

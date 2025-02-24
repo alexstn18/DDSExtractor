@@ -1,3 +1,4 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include <iostream>
 #include <vector>
 #include <filesystem>
@@ -25,7 +26,7 @@ int main(int argc, char* argv[])
 
     if ( argc < 2 )
     {
-        std::cout << "Please specify the mode that the tool should run in (--extract, --extracthashed or --import): ";
+        std::cout << "Please specify the mode that the tool should run in (--extract --extracthashed --import --nmhfixandhash or --bintodds): ";
         std::getline( std::cin, mode );
     }
     else
@@ -33,7 +34,7 @@ int main(int argc, char* argv[])
         mode = argv[1];
     }
 
-    if ( mode != "--extract" && mode != "--extracthashed" && mode != "--import" && mode != "--nmhfixandhash" && mode != "--btole" && mode != "--extractarchive" )
+    if ( mode != "--extract" && mode != "--extracthashed" && mode != "--import" && mode != "--nmhfixandhash" && mode != "--btole" && mode != "--extractarchive" && mode != "--gm2" && mode != "--bintodds")
     {
         std::cerr << "Invalid mode: " << mode << std::endl;
         std::cerr << "Mode flag should be either --extract to extract DDS files, or --import to re-import DDS files" << std::endl;
@@ -56,11 +57,11 @@ int main(int argc, char* argv[])
     if ( extractor_mode_flag == ExtractorMode::NONE ) 
     {
         std::cerr << "Invalid mode: " << mode << std::endl;
-        std::cerr << "Mode flag should be one of --extract, --extracthashed or --import" << std::endl;
+        std::cerr << "Mode flag should be one of --extract, --extracthashed, --import, --nmhfixandhash or --bintodds" << std::endl;
         return 1;
     }
 
-    std::vector<std::string> extensions = { ".bin", ".BIN", ".dat", ".DAT", ".sti", ".STI", ".jmb", ".JMB" };
+    std::vector<std::string> extensions = { ".bin", ".BIN", ".dat", ".DAT", ".sti", ".STI", ".jmb", ".JMB", ".GM2" };
 
     DDSExtractor::ProcessDirectory( directory, extensions, extractor_mode_flag );
 

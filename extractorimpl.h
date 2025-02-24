@@ -3,6 +3,7 @@
 
 #include "inc_wrapper.h"
 #include "hasher.h"
+#include "NMH.h"
 
 const std::vector<uint8_t> DDS_MAGIC_PATTERN = { 0x44, 0x44, 0x53, 0x20, 0x7C };
 
@@ -15,6 +16,8 @@ enum class ExtractorMode
     METADATA,
     NMH_FIX_AND_HASH,
     BIG_TO_LITTLE_ENDIAN,
+    GM2,
+    BIN_TO_DDS,
     NONE
 };
 
@@ -31,6 +34,8 @@ namespace DDSExtractor
         if ( mode_string == "--metadata" ) return ExtractorMode::METADATA;
         if ( mode_string == "--nmhfixandhash" ) return ExtractorMode::NMH_FIX_AND_HASH;
         if ( mode_string == "--btole" ) return ExtractorMode::BIG_TO_LITTLE_ENDIAN;
+        if ( mode_string == "--gm2" ) return ExtractorMode::GM2;
+        if ( mode_string == "--bintodds" ) return ExtractorMode::BIN_TO_DDS;
 
         return ExtractorMode::NONE;
     }
@@ -410,6 +415,16 @@ namespace DDSExtractor
                         {
                             fs::path out = file_path.parent_path() / (file_path.stem().string() + "_le.bin");
                             convertBigEndianToLittleEndian(file_path, out);
+                            break;
+                        }
+                        case ExtractorMode::GM2:
+                        {
+                            // ExtractGCT0FromArchive(file_path);
+                            break;
+                        }
+                        case ExtractorMode::BIN_TO_DDS:
+                        {
+                            GCT0CMPRToDXT1DDS(file_path);
                             break;
                         }
                         default:
